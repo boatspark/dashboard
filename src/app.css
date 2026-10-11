@@ -29,7 +29,12 @@
 body {
 	margin: 0;
 }
+:root:has(main.night-mode),
+body:has(main.night-mode) {
+	background: #000;
+}
 main {
+	background: var(--background);
 	max-width: 2400px;
 	min-height: 100dvh;
 	margin: auto;
@@ -37,6 +42,9 @@ main {
 	display: flex;
 	flex-direction: column;
 	gap: 1.25rem;
+}
+main.night-mode {
+	filter: brightness(0.1);
 }
 header {
 	display: flex;

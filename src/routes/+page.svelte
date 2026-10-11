@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
+	import type { PageProps } from './$types';
 	import BatteryDial from '#lib/components/BatteryDial.svelte';
 	import HistoryChart from '#lib/components/HistoryChart.svelte';
 	import MetricCard from '#lib/components/MetricCard.svelte';
@@ -7,6 +8,7 @@
 	import {
 		displayValue,
 		emptyCurrent,
+		isNightTime,
 		mergeCurrent,
 		metricKeys,
 		observedCycles,
@@ -22,10 +24,11 @@
 		type Point
 	} from '#lib/data.js';
 
+	let { data }: PageProps = $props();
 	let current = $state(emptyCurrent());
 	let history = $state<History | null>(null);
-	let now = $state(Date.now());
-	let loadedAt = $state(Date.now());
+	let now = $state(untrack(() => data.initialTime));
+	let loadedAt = $state(untrack(() => data.initialTime));
 	let refreshedAt = $state<number | null>(null);
 	let currentError = $state('Loading current data');
 	let historyError = $state('Loading history');
@@ -36,6 +39,7 @@
 	let capability = $state('');
 	let enterFullscreen = $state<(() => Promise<void>) | null>(null);
 	let start = $derived(now - WINDOW);
+	let nightMode = $derived(isNightTime(now));
 	let bounds = $derived(temperatureBounds(history, start, now));
 	let count = $derived(
 		observedCycles(
@@ -53,7 +57,8 @@
 	] as const;
 
 	onMount(() => {
-		loadedAt = Date.now();
+		now = Date.now();
+		loadedAt = now;
 		let active = true;
 		let pending = false;
 		let lastAttempt = 0;
@@ -160,7 +165,7 @@
 	/>
 </svelte:head>
 
-<main>
+<main class:night-mode={nightMode}>
 	<header>
 		<div>
 			<p class="eyebrow">BOAT SPARK</p>

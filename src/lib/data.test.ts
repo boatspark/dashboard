@@ -4,6 +4,7 @@ import {
 	emptyCurrent,
 	freshness,
 	HOUR,
+	isNightTime,
 	mergeCurrent,
 	observedCycles,
 	pacificTime,
@@ -13,6 +14,31 @@ import {
 	voltageTone,
 	type History
 } from './data';
+
+describe('Pacific night schedule', () => {
+	it.each([
+		['2026-01-02T05:59:59Z', false],
+		['2026-01-02T06:00:00Z', true],
+		['2026-01-02T08:00:00Z', true],
+		['2026-01-02T12:59:59Z', true],
+		['2026-01-02T13:00:00Z', false],
+		['2026-01-02T20:00:00Z', false],
+		['2026-07-02T04:59:59Z', false],
+		['2026-07-02T05:00:00Z', true],
+		['2026-07-02T07:00:00Z', true],
+		['2026-07-02T11:59:59Z', true],
+		['2026-07-02T12:00:00Z', false],
+		['2026-07-02T19:00:00Z', false],
+		['2026-03-08T09:59:59Z', true],
+		['2026-03-08T10:00:00Z', true],
+		['2026-03-08T12:00:00Z', false],
+		['2026-11-01T08:30:00Z', true],
+		['2026-11-01T09:30:00Z', true],
+		['2026-11-01T13:00:00Z', false]
+	])('evaluates %s as night=%s across PST, PDT and DST transitions', (at, expected) => {
+		expect(isNightTime(Date.parse(at))).toBe(expected);
+	});
+});
 
 describe('current display', () => {
 	it.each([

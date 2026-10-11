@@ -1,6 +1,19 @@
 export const HOUR = 60 * 60 * 1000;
 export const WINDOW = 48 * HOUR;
 export const POLL_INTERVAL = 60_000;
+export const PACIFIC_TIME_ZONE = 'America/Los_Angeles';
+const pacificHour = new Intl.DateTimeFormat('en-US', {
+	timeZone: PACIFIC_TIME_ZONE,
+	hour: 'numeric',
+	hourCycle: 'h23'
+});
+
+export function isNightTime(at: number): boolean {
+	const part = pacificHour.formatToParts(at).find((part) => part.type === 'hour');
+	if (!part) throw new Error('Pacific hour could not be formatted');
+	const hour = Number(part.value);
+	return hour >= 22 || hour < 5;
+}
 export const temperatureKeys = ['galley', 'fridge', 'engine'] as const;
 export const metricKeys = [
 	'battery1',
@@ -143,7 +156,7 @@ export function temperatureBounds(history: History | null, start: number, end: n
 export function pacificTime(at: number | null, date = false): string {
 	if (at === null) return '--';
 	return new Intl.DateTimeFormat('en-US', {
-		timeZone: 'America/Los_Angeles',
+		timeZone: PACIFIC_TIME_ZONE,
 		...(date ? { month: 'short', day: 'numeric' } : {}),
 		hour: 'numeric',
 		minute: '2-digit',
