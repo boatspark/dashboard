@@ -102,5 +102,5 @@ export function prototypeResponse(scenario: Scenario, now: number): DashboardRes
 }
 
 export function prototypeData(scenario: Scenario, now = Date.now()) {
-	return screenData(prototypeResponse(scenario, now), now, scenario);
+	return screenData(prototypeResponse(scenario, now), now, { mode: 'prototype', scenario });
 }

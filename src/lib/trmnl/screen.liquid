@@ -121,7 +121,7 @@
 <div class="boat-screen" aria-label="Boat Spark TRMNL prototype">
 	<header>
 		<h1>BOAT SPARK</h1>
-		<span>SYNTHETIC PROTOTYPE / {{ scenario | escape }}</span>
+		<span>{{ screenLabel | escape }}</span>
 	</header>
 	<div class="boat-banner {% if warning %}boat-alert{% endif %}" role="status">
 		{{ banner | escape }}

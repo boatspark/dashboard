@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { Liquid } from 'liquidjs';
 
 const scenarios = [
 	'normal',
@@ -80,4 +82,48 @@ test('TRMNL rejects unknown scenarios without interpreting arbitrary input', asy
 		const response = await request.get(`${path}?scenario=unknown`);
 		expect(response.status()).toBe(400);
 	}
+});
+
+test('live TRMNL requires authorization and reports unavailable sources without inventing readings', async ({
+	request,
+	page
+}, testInfo) => {
+	const missing = await request.get('/api/trmnl');
+	expect(missing.status()).toBe(401);
+	expect(missing.headers()['cache-control']).toBe('private, no-store');
+	const wrong = await request.get('/api/trmnl', {
+		headers: { Authorization: `Bearer ${'y'.repeat(64)}` }
+	});
+	expect(wrong.status()).toBe(401);
+	const response = await request.get('/api/trmnl', {
+		headers: { Authorization: `Bearer ${'x'.repeat(64)}` }
+	});
+	expect(response.status()).toBe(200);
+	const data = await response.json();
+	expect(data.screenLabel).toBe('BOAT MONITOR');
+	expect(data.banner).toContain('CURRENT UNAVAILABLE');
+	expect(data.banner).toContain('HISTORY UNAVAILABLE');
+	expect(data.batteries[0].value).toBe('--');
+	expect(data.statuses[0].value).toBe('--');
+	expect(data.cycles.value).toBe('--');
+	expect(JSON.stringify(data)).not.toContain('SYNTHETIC');
+	const template = await readFile(
+		new URL('../src/lib/trmnl/screen.liquid', import.meta.url),
+		'utf8'
+	);
+	const markup = await new Liquid({ strictVariables: true }).parseAndRender(template, data);
+	await page.setContent(
+		`<style>html,body{margin:0;padding:0;background:#fff;color:#000}</style>${markup}`
+	);
+	await expect(page.getByText('BOAT MONITOR')).toBeVisible();
+	await expect(page.getByRole('status')).toContainText('CURRENT UNAVAILABLE');
+	await expect(page.getByRole('article', { name: 'Shore power' })).toContainText('--');
+	const screen = await page.locator('.boat-screen').evaluate((element) => ({
+		width: element.scrollWidth,
+		height: element.scrollHeight
+	}));
+	expect(screen).toEqual({ width: 800, height: 480 });
+	const path = testInfo.outputPath('live-unavailable.png');
+	await page.screenshot({ path });
+	await testInfo.attach('TRMNL live unavailable', { path, contentType: 'image/png' });
 });

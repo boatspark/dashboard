@@ -89,7 +89,7 @@ describe('TRMNL prototype presentation', () => {
 		);
 		expect(result.segments).toEqual([
 			'M32.0,65.0 L58.4,36.0',
-			'M111.2,7.0',
+			'M111.2,7.0 L111.2,7.0',
 			'M269.6,50.5 L296.0,36.0'
 		]);
 		expect(result.note).toBe('Outside chart range');
@@ -103,10 +103,30 @@ describe('TRMNL prototype presentation', () => {
 			expect(markup).not.toContain('{{');
 			expect(markup.match(/class="boat-chart"/g)).toHaveLength(5);
 		}
-		const data = screenData(prototypeResponse('normal', now), now, '<script>bad()</script>');
+		const data = screenData(prototypeResponse('normal', now), now, {
+			mode: 'prototype',
+			scenario: '<script>bad()</script>'
+		});
 		const markup = await liquid.parseAndRender(template, data);
 		expect(markup).toContain('&lt;script&gt;bad()&lt;/script&gt;');
 		expect(markup).not.toContain('<script>');
+	});
+
+	it('renders real data without synthetic labels and distinguishes stale from missing history', async () => {
+		const response = prototypeResponse('normal', now);
+		const live = () => screenData(response, now, { mode: 'live', loadedAt: now, observations: [] });
+		const data = live();
+		expect(data.screenLabel).toBe('BOAT MONITOR');
+		expect(data.banner).toBe('BOAT DATA · PERIODIC SNAPSHOT');
+		expect(data.batteries[0].value).toBe('12.97');
+		const markup = await new Liquid().parseAndRender(template, data);
+		expect(markup).toContain('BOAT MONITOR');
+		expect(markup).not.toContain('SYNTHETIC');
+		expect(Buffer.byteLength(JSON.stringify(data))).toBeLessThan(100_000);
+		response.history.error = 'History data request failed';
+		expect(live().banner).toContain('HISTORY STALE');
+		response.history.data = null;
+		expect(live().banner).toContain('HISTORY UNAVAILABLE');
 	});
 
 	it('accepts only named scenarios', () => {

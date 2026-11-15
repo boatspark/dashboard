@@ -35,11 +35,11 @@ docker run --rm --name boatspark-dashboard \
 
 Local builds use the host architecture, so arm64 is supported for development and testing. CI publishes only `linux/amd64` (x64). The build stage runs natively and produces platform-independent JavaScript; the final stage selects the requested Node runtime platform.
 
-The private environment file contains `BOATSPARK_BASE_URL` and `ORIGIN`, where `ORIGIN` is the browser-facing origin, for example `https://dashboard.example.com`. Supply both at runtime; the image builds without the upstream secret. Keep the file outside source control and restrict its filesystem permissions.
+The private environment file contains `BOATSPARK_BASE_URL` and `ORIGIN`, where `ORIGIN` is the browser-facing origin, for example `https://dashboard.example.com`. `TRMNL_API_TOKEN` is optional and enables the authenticated live TRMNL endpoint. Supply these at runtime; the image builds without secrets. Keep the file outside source control and restrict its filesystem permissions.
 
 Attach the container to the existing Traefik Docker network. Configure an HTTPS router for the dashboard hostname and a service pointing to container port `3000`. The container serves **HTTP**; Traefik terminates TLS. `GET /health` checks server readiness without depending on upstream availability. The runtime uses the non-root `node` user.
 
-The application does not authenticate viewers. Protect the dashboard and its `/api/dashboard` route with your Traefik access policy if the boat data should not be public. The hidden upstream URL is not dashboard access control.
+The main dashboard and its `/api/dashboard` route do not authenticate viewers. Protect them with your Traefik access policy if the boat data should not be public. The hidden upstream URL is not dashboard access control. The separate live `/api/trmnl` endpoint requires its own bearer token.
 
 ## Display behavior
 
@@ -61,6 +61,23 @@ The upstream history is sampled at 15-minute intervals. The first sample is not 
 
 The count is always **observed**, not exact: cycles before a reset may be lost, and a reset that has already caught up to the old counter can be invisible. Reloading the browser discards its extra observations. An exact total requires upstream event data or exact boundary/reset information.
 
+## Live TRMNL display
+
+The private TRMNL plugin can poll `/api/trmnl` for real readings. It uses the same server-side Boat Spark normalization and display thresholds as the dashboard; it never exposes `BOATSPARK_BASE_URL`. The endpoint accepts only a bearer token in the `Authorization` header, uses `Cache-Control: private, no-store`, and returns 503 when its token is missing or invalid and 401 for missing or incorrect credentials. It does not change the dashboard API response.
+
+To migrate the tested prototype to live data:
+
+1. Generate a **new, unique** random token with `openssl rand -hex 32`. Add it as `TRMNL_API_TOKEN` to the dashboard's private runtime environment file, then redeploy/restart the container with that file. Keep the token out of source control, URLs, build arguments, logs, and chat; do not reuse the Boat Spark URL or another credential. Omit or clear this variable to disable the endpoint. The token must contain 32–256 printable ASCII characters without spaces; the recommended command produces 64 hexadecimal characters.
+2. Verify an unauthenticated request to `https://YOUR-DASHBOARD-HOST/api/trmnl` returns **401**. A **503** means the token is not configured correctly. Any existing Traefik access policy must also allow TRMNL's polling request to reach this route; do not remove protection from the main dashboard or `/api/dashboard`.
+3. In the existing private plugin, keep **Polling / GET** and change the single URL to `https://YOUR-DASHBOARD-HOST/api/trmnl`. Add `Authorization: Bearer YOUR_TOKEN` in **Polling Headers**, using the same token from the runtime environment. Treat the plugin settings as sensitive; TRMNL receives the selected boat data.
+4. Replace the **Full** markup with the updated [`src/lib/trmnl/screen.liquid`](src/lib/trmnl/screen.liquid), save, and force-refresh the plugin. Keep **Remove Bleed Margin** enabled and use the full-screen playlist item. Press the device's next-screen button to request an update.
+
+The endpoint fetches current and history in parallel with a seven-second upstream timeout to stay below [TRMNL's ten-second polling timeout](https://help.trmnl.com/en/articles/17434705-plugin-strategies). On failure it returns a screen with the last available values/history marked stale, or `--` if none are available. Measurement times and the snapshot time are distinct. A twelve-hour lack of valid measurements is prominent; if a source was unavailable from the beginning, that interval starts with the first server observation.
+
+Last-good readings, history, and extra bilge counter observations are retained **in the Node process's memory**, populated by both dashboard and TRMNL requests while the token is configured. A restart loses this state; an unavailable source then displays `--` until a successful fetch. Each server process maintains separate state. The browser still maintains its own session observations, so the two observed-cycle counts can differ due to timing, reloads, or resets; neither is an exact count.
+
+TRMNL is a periodically refreshed display, **not an immediate bilge alarm**. A disconnected device cannot update its stale warning; check the snapshot and measurement times. Actual refresh also depends on device, plugin, and playlist settings.
+
 ## TRMNL prototype (synthetic data only)
 
 This is an unpublished, full-screen 800×480 monochrome prototype for a TRMNL OG. It does **not** read Boat Spark, retain live readings, or change the existing dashboard. The prototype URLs contain only generated example data and intentionally have no application-level authentication; any existing Traefik policy still applies.
@@ -78,9 +95,7 @@ Deploy this prototype using the normal dashboard deployment, then:
 5. Select TRMNL OG / landscape / monochrome in the preview where offered. Force-refresh the plugin to load its variables. Add it as one **full-screen** playlist item, not a mashup. Use 15-minute plugin and device refresh settings for this trial.
 6. To test a warning screen, append one of the scenario queries above to the polling URL, save, and force-refresh. The device still needs to check in; press its next-screen button after refreshing the plugin to test immediately.
 
-Do **not** publish a Recipe or share the plugin. No API key, webhook URL, OAuth app, or live boat credentials are needed. TRMNL receives only synthetic data at this stage. If fetching fails, inspect your existing access policy and TRMNL's plugin variables/error rather than disabling dashboard protection.
-
-After proving the template renders correctly and is readable on the physical device, the remaining work is a restricted live-data endpoint, shared last-good/observation state, outage handling, and replacing the prototype labels and URL. The prototype's stale scenario is simulated, not working live-data retention. It is not an immediate bilge alarm.
+Do **not** publish a Recipe or share the plugin. The prototype requires no API key, webhook URL, OAuth app, or live boat credentials. TRMNL receives only synthetic data when polling this prototype URL. If fetching fails, inspect your existing access policy and TRMNL's plugin variables/error rather than disabling dashboard protection. The prototype's stale scenario is simulated, not live-data retention.
 
 Focused validation: `npm run test:unit -- --run src/lib/trmnl/data.test.ts` and `npm run test:e2e -- tests/trmnl.e2e.ts`. Browser tests save 800×480 screenshots for every scenario under `test-results/`.
 

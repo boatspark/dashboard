@@ -32,18 +32,21 @@ export function chart(
 	let path = '';
 	let previous: number | null = null;
 	let overflow = false;
+	const finishSegment = () => {
+		// A zero-length line with round caps makes a lone reading visible.
+		if (path) segments.push(path.includes(' L') ? path : `${path} L${path.slice(1)}`);
+		path = '';
+	};
 	for (const point of sortedPoints(points).filter(
 		(point) => point.at >= start && point.at <= end
 	)) {
 		if (point.value === null) {
-			if (path) segments.push(path);
-			path = '';
+			finishSegment();
 			previous = null;
 			continue;
 		}
 		if (previous !== null && point.at - previous > interval * 2) {
-			if (path) segments.push(path);
-			path = '';
+			finishSegment();
 		}
 		overflow ||= point.value < bounds[0] || point.value > bounds[1];
 		const value = Math.max(bounds[0], Math.min(bounds[1], point.value));
@@ -52,7 +55,7 @@ export function chart(
 		path += `${path ? ' L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`;
 		previous = point.at;
 	}
-	if (path) segments.push(path);
+	finishSegment();
 	return {
 		segments,
 		top: String(bounds[1]),
@@ -65,14 +68,19 @@ export function chart(
 	};
 }
 
-export function screenData(response: DashboardResponse, now: number, scenario: string) {
+type ScreenOptions =
+	| { mode: 'prototype'; scenario: string }
+	| { mode: 'live'; loadedAt: number; observations: Point[] };
+
+export function screenData(response: DashboardResponse, now: number, options: ScreenOptions) {
 	const current = response.current.data ?? emptyCurrent();
 	const history = response.history.data;
 	const start = now - WINDOW;
 	const interval = history?.interval ?? 900_000;
 	const bounds = temperatureBounds(history, start, now);
 	const status = (metric: Metric) => {
-		const label = freshness(metric, now, now, !!response.current.error);
+		const loadedAt = options.mode === 'live' ? options.loadedAt : now;
+		const label = freshness(metric, now, loadedAt, !!response.current.error);
 		return label === 'No valid measurement for 12 hours' ? 'NO DATA 12H' : label.toUpperCase();
 	};
 	const tile = (
@@ -103,6 +111,7 @@ export function screenData(response: DashboardResponse, now: number, scenario: s
 	const count = observedCycles(
 		[
 			...(history?.cycles ?? []),
+			...(options.mode === 'live' ? options.observations : []),
 			...(counter.at !== null && counter.value !== null
 				? [{ at: counter.at, value: counter.value }]
 				: [])
@@ -112,17 +121,25 @@ export function screenData(response: DashboardResponse, now: number, scenario: s
 		interval
 	);
 	const warnings = [
-		response.current.error ? 'CURRENT DATA STALE' : '',
-		response.history.error ? 'HISTORY UNAVAILABLE' : '',
+		response.current.error
+			? Object.values(current).some((metric) => metric.value !== null)
+				? 'CURRENT DATA STALE'
+				: 'CURRENT UNAVAILABLE'
+			: '',
+		response.history.error ? (history ? 'HISTORY STALE' : 'HISTORY UNAVAILABLE') : '',
 		...Object.values(current).map(status)
 	].filter(Boolean);
 	const banner = warnings.includes('NO DATA 12H')
 		? 'NO VALID MEASUREMENT FOR 12 HOURS'
 		: warnings.length
 			? [...new Set(warnings)].join(' · ')
-			: 'SYNTHETIC DATA · NOT LIVE BOAT READINGS';
+			: options.mode === 'live'
+				? 'BOAT DATA · PERIODIC SNAPSHOT'
+				: 'SYNTHETIC DATA · NOT LIVE BOAT READINGS';
 	return {
-		scenario,
+		scenario: options.mode === 'prototype' ? options.scenario : '',
+		screenLabel:
+			options.mode === 'prototype' ? `SYNTHETIC PROTOTYPE / ${options.scenario}` : 'BOAT MONITOR',
 		banner,
 		warning: warnings.length > 0,
 		snapshot: pacificTime(response.refreshedAt, true),
@@ -148,7 +165,7 @@ export function screenData(response: DashboardResponse, now: number, scenario: s
 		})),
 		cycles: {
 			value: count.value === null ? '--' : String(count.value),
-			note: status(counter) || (count.incomplete ? 'INCOMPLETE COVERAGE' : 'Sampled counter'),
+			note: count.incomplete ? 'INCOMPLETE COVERAGE' : status(counter) || 'Sampled counter',
 			alert: !!status(counter) || count.incomplete
 		}
 	};

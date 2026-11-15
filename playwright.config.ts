@@ -8,7 +8,12 @@ export default defineConfig({
 	webServer: {
 		command: 'npm run build && node build/index.js',
 		url: 'http://127.0.0.1:4173/health',
-		env: { PORT: '4173', HOST: '127.0.0.1', BOATSPARK_BASE_URL: '' },
+		env: {
+			PORT: '4173',
+			HOST: '127.0.0.1',
+			BOATSPARK_BASE_URL: '',
+			TRMNL_API_TOKEN: 'x'.repeat(64)
+		},
 		reuseExistingServer: false
 	}
 });

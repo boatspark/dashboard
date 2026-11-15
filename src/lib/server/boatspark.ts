@@ -24,7 +24,8 @@ export function configuredBase(value: string | undefined): string {
 export async function upstream<T>(
 	resource: 'current' | 'history',
 	normalize: (value: unknown) => T,
-	fetcher: typeof fetch = fetch
+	fetcher: typeof fetch = fetch,
+	timeout = 15_000
 ): Promise<Result<T>> {
 	let base: string;
 	try {
@@ -37,7 +38,7 @@ export async function upstream<T>(
 		const response = await fetcher(`${base}/${resource}`, {
 			headers: { Accept: 'application/json' },
 			redirect: 'error',
-			signal: AbortSignal.timeout(15_000),
+			signal: AbortSignal.timeout(timeout),
 			cache: 'no-store'
 		});
 		if (!response.ok) {
