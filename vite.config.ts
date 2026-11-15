@@ -3,6 +3,8 @@ import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
+	// The Docker runtime ships the build without node_modules.
+	ssr: { noExternal: ['liquidjs'] },
 	plugins: [
 		sveltekit({
 			compilerOptions: {

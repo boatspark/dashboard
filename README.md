@@ -61,6 +61,29 @@ The upstream history is sampled at 15-minute intervals. The first sample is not 
 
 The count is always **observed**, not exact: cycles before a reset may be lost, and a reset that has already caught up to the old counter can be invisible. Reloading the browser discards its extra observations. An exact total requires upstream event data or exact boundary/reset information.
 
+## TRMNL prototype (synthetic data only)
+
+This is an unpublished, full-screen 800×480 monochrome prototype for a TRMNL OG. It does **not** read Boat Spark, retain live readings, or change the existing dashboard. The prototype URLs contain only generated example data and intentionally have no application-level authentication; any existing Traefik policy still applies.
+
+Run `npm run dev` and open `/trmnl/prototype`. Add `?scenario=low-voltage`, `stale`, `missing-history`, `counter-reset`, or `unavailable` to exercise warnings, chart gaps, counter resets, and missing readings. `normal` is the default. Every screen is labelled synthetic. The browser preview renders the same Liquid file used on TRMNL, with no client-side scripts or external assets. Black/white CSS still has browser/device text antialiasing; physical-device readability must be checked.
+
+### Manual TRMNL configuration
+
+Deploy this prototype using the normal dashboard deployment, then:
+
+1. Enable Developer Edition on your TRMNL OG if it is not already enabled.
+2. Add a **Private Plugin**, name it `Boat Spark prototype`, and choose **Polling** with **GET**.
+3. Set its single polling URL to `https://YOUR-DASHBOARD-HOST/api/trmnl/prototype`. Leave polling body and headers empty unless your existing access policy requires authentication headers. Do not change the upstream Boat Spark URL or make `/api/dashboard` public for this prototype.
+4. Save the plugin. In **Edit Markup**, paste the complete contents of [`src/lib/trmnl/screen.liquid`](src/lib/trmnl/screen.liquid) into **Full**. Leave **Shared** and the other layouts empty. Enable **Remove Bleed Margin**: this custom layout already includes its own padding and uses the whole 800×480 canvas.
+5. Select TRMNL OG / landscape / monochrome in the preview where offered. Force-refresh the plugin to load its variables. Add it as one **full-screen** playlist item, not a mashup. Use 15-minute plugin and device refresh settings for this trial.
+6. To test a warning screen, append one of the scenario queries above to the polling URL, save, and force-refresh. The device still needs to check in; press its next-screen button after refreshing the plugin to test immediately.
+
+Do **not** publish a Recipe or share the plugin. No API key, webhook URL, OAuth app, or live boat credentials are needed. TRMNL receives only synthetic data at this stage. If fetching fails, inspect your existing access policy and TRMNL's plugin variables/error rather than disabling dashboard protection.
+
+After proving the template renders correctly and is readable on the physical device, the remaining work is a restricted live-data endpoint, shared last-good/observation state, outage handling, and replacing the prototype labels and URL. The prototype's stale scenario is simulated, not working live-data retention. It is not an immediate bilge alarm.
+
+Focused validation: `npm run test:unit -- --run src/lib/trmnl/data.test.ts` and `npm run test:e2e -- tests/trmnl.e2e.ts`. Browser tests save 800×480 screenshots for every scenario under `test-results/`.
+
 ## Automated image publishing
 
 `.github/workflows/docker.yml` runs on every push to `main`, checks the application and tests, then builds `linux/amd64` and publishes:

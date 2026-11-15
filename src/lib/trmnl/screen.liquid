@@ -1,0 +1,199 @@
+<style>
+	.boat-screen {
+		box-sizing: border-box;
+		width: 800px;
+		height: 480px;
+		padding: 12px 16px;
+		display: grid;
+		grid-template-rows: 28px 24px 139px 65px 139px 21px;
+		gap: 8px;
+		background: #fff;
+		color: #000;
+		color-scheme: light;
+		font-family: Arial, Helvetica, sans-serif;
+		font-size: 14px;
+		line-height: 1.15;
+	}
+	.boat-screen * {
+		box-sizing: border-box;
+	}
+	.boat-screen h1,
+	.boat-screen h2,
+	.boat-screen p {
+		margin: 0;
+		padding: 0;
+		color: inherit;
+		font-family: inherit;
+		line-height: inherit;
+		letter-spacing: normal;
+	}
+	.boat-screen header,
+	.boat-screen footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.boat-screen h1 {
+		font-size: 24px;
+		font-weight: 700;
+	}
+	.boat-screen h2 {
+		font-size: 17px;
+		font-weight: 700;
+	}
+	.boat-screen .boat-banner {
+		border: 1px solid #000;
+		padding: 3px 6px;
+		font-size: 14px;
+		font-weight: 700;
+	}
+	.boat-screen .boat-alert {
+		background: #000;
+		color: #fff;
+	}
+	.boat-screen .boat-row {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 12px;
+	}
+	.boat-screen .boat-batteries {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.boat-screen .boat-card {
+		min-width: 0;
+		border-top: 2px solid #000;
+		padding-top: 4px;
+	}
+	.boat-screen .boat-reading {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 4px;
+	}
+	.boat-screen .boat-number {
+		font-size: 31px;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+	.boat-screen .boat-unit {
+		font-size: 17px;
+		font-weight: 400;
+	}
+	.boat-screen .boat-badge {
+		font-size: 12px;
+		font-weight: 700;
+		padding: 2px 4px;
+		max-width: 155px;
+		text-align: right;
+	}
+	.boat-screen .boat-small {
+		font-size: 12px;
+	}
+	.boat-screen .boat-chart {
+		display: block;
+		width: 100%;
+		height: 57px;
+	}
+	.boat-screen .boat-chart text {
+		font-family: Arial, Helvetica, sans-serif;
+		font-size: 13px;
+		fill: #000;
+	}
+	.boat-screen .boat-switch {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 6px;
+		margin-bottom: 5px;
+	}
+	.boat-screen .boat-switch .boat-number {
+		font-size: 25px;
+		padding: 0 4px;
+	}
+	.boat-screen footer {
+		border-top: 1px solid #000;
+		padding-top: 4px;
+		font-size: 12px;
+	}
+</style>
+
+<div class="boat-screen" aria-label="Boat Spark TRMNL prototype">
+	<header>
+		<h1>BOAT SPARK</h1>
+		<span>SYNTHETIC PROTOTYPE / {{ scenario | escape }}</span>
+	</header>
+	<div class="boat-banner {% if warning %}boat-alert{% endif %}" role="status">
+		{{ banner | escape }}
+	</div>
+	<div class="boat-row boat-batteries">
+		{% for tile in batteries %}
+		<article class="boat-card" aria-label="{{ tile.title | escape }}">
+			<h2>{{ tile.title | escape }}</h2>
+			<div class="boat-reading">
+				<p class="boat-number">{{ tile.value | escape }} <span class="boat-unit">{{ tile.unit | escape }}</span></p>
+				<span class="boat-badge {% if tile.alert %}boat-alert{% endif %}">{{ tile.status | escape }}</span>
+			</div>
+			<p class="boat-small">Measured {{ tile.measured | escape }}</p>
+			<svg class="boat-chart" viewBox="0 0 300 72" preserveAspectRatio="none" role="img" aria-label="{{ tile.title | escape }}, last 48 hours">
+				{% if tile.chart.segments.size > 0 %}
+				<text x="0" y="14">{{ tile.chart.top | escape }}</text>
+				<text x="0" y="65">{{ tile.chart.bottom | escape }}</text>
+				<path d="M32,7 H296 M32,65 H296" stroke="#000" stroke-width="1" stroke-dasharray="2 5" fill="none" />
+				{% for segment in tile.chart.segments %}
+				<path class="boat-series" d="{{ segment | escape }}" stroke="#000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+				{% endfor %}
+				{% endif %}
+			</svg>
+			<p class="boat-small">{{ tile.chart.note | escape }}</p>
+		</article>
+		{% endfor %}
+	</div>
+	<div class="boat-row">
+		{% for tile in statuses %}
+		<article class="boat-card" aria-label="{{ tile.title | escape }}">
+			<div class="boat-switch">
+				<h2>{{ tile.title | escape }}</h2>
+				<span class="boat-number {% if tile.alert %}boat-alert{% endif %}">{{ tile.value | escape }}</span>
+			</div>
+			<p class="boat-small">{{ tile.note | escape }}</p>
+		</article>
+		{% endfor %}
+		<article class="boat-card" aria-label="Observed cycles (48h)">
+			<div class="boat-switch">
+				<h2>Observed cycles (48h)</h2>
+				<span class="boat-number">{{ cycles.value | escape }}</span>
+			</div>
+			<p class="boat-small {% if cycles.alert %}boat-alert{% endif %}">{{ cycles.note | escape }} · resets may hide cycles</p>
+		</article>
+	</div>
+	<div class="boat-row">
+		{% for tile in temperatures %}
+		<article class="boat-card" aria-label="{{ tile.title | escape }}">
+			<h2>{{ tile.title | escape }}</h2>
+			<div class="boat-reading">
+				<p class="boat-number">{{ tile.value | escape }} <span class="boat-unit">{{ tile.unit | escape }}</span></p>
+				{% if tile.status != "" %}
+				<span class="boat-badge {% if tile.alert %}boat-alert{% endif %}">{{ tile.status | escape }}</span>
+				{% endif %}
+			</div>
+			<p class="boat-small">Measured {{ tile.measured | escape }}</p>
+			<svg class="boat-chart" viewBox="0 0 300 72" preserveAspectRatio="none" role="img" aria-label="{{ tile.title | escape }}, last 48 hours">
+				{% if tile.chart.segments.size > 0 %}
+				<text x="0" y="14">{{ tile.chart.top | escape }}</text>
+				<text x="0" y="65">{{ tile.chart.bottom | escape }}</text>
+				<path d="M32,7 H296 M32,65 H296" stroke="#000" stroke-width="1" stroke-dasharray="2 5" fill="none" />
+				{% for segment in tile.chart.segments %}
+				<path class="boat-series" d="{{ segment | escape }}" stroke="#000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+				{% endfor %}
+				{% endif %}
+			</svg>
+			<p class="boat-small">{{ tile.chart.note | escape }}</p>
+		</article>
+		{% endfor %}
+	</div>
+	<footer>
+		<span>Snapshot {{ snapshot | escape }} · times Pacific</span>
+		<span>48-hour history · temperatures share a scale</span>
+	</footer>
+</div>
